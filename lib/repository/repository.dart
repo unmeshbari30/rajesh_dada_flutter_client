@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:mime/mime.dart';
+import 'package:rajesh_dada_padvi/models/emergency_contact_model.dart';
 import 'package:rajesh_dada_padvi/models/Files/files_response_model.dart';
 import 'package:rajesh_dada_padvi/models/Files/mla_info_model.dart';
 import 'package:rajesh_dada_padvi/models/complaint_payload_model.dart';
@@ -391,8 +392,85 @@ class Repository {
       print("Unexpected error: $e");
     }
 
-    // If everything fails, return null instead of throwing exception
     return null;
+  }
+
+  Future<List<EmergencyContactModel>?> getEmergencyContacts() async {
+    try {
+      final response = await dio.get("/api/v1/emergency-contacts");
+      if (response.statusCode == 200) {
+        final result = EmergencyContactsResponse.fromJson(response.data);
+        return result.contacts;
+      }
+    } on DioException catch (e) {
+      print("Dio error: ${e.message}");
+      if (e.response != null) {
+        print("Response data: ${e.response?.data}");
+        print("Status code: ${e.response?.statusCode}");
+      }
+    } catch (e) {
+      print("Unexpected error: $e");
+    }
+    return null;
+  }
+
+  Future<EmergencyContactModel?> createEmergencyContact(
+    EmergencyContactModel contact,
+  ) async {
+    try {
+      final response = await dio.post(
+        "/api/v1/emergency-contacts",
+        data: jsonEncode(contact.toJson()),
+      );
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return EmergencyContactModel.fromJson(response.data);
+      }
+    } on DioException catch (e) {
+      print("Dio error: ${e.message}");
+      if (e.response != null) {
+        print("Response data: ${e.response?.data}");
+        print("Status code: ${e.response?.statusCode}");
+      }
+    } catch (e) {
+      print("Unexpected error: $e");
+    }
+    return null;
+  }
+
+  Future<EmergencyContactModel?> updateEmergencyContact(
+    String id,
+    EmergencyContactModel contact,
+  ) async {
+    try {
+      final response = await dio.patch(
+        "/api/v1/emergency-contacts/$id",
+        data: jsonEncode(contact.toJson()),
+      );
+      if (response.statusCode == 200) {
+        return EmergencyContactModel.fromJson(response.data);
+      }
+    } on DioException catch (e) {
+      print("Dio error: ${e.message}");
+      if (e.response != null) {
+        print("Response data: ${e.response?.data}");
+        print("Status code: ${e.response?.statusCode}");
+      }
+    } catch (e) {
+      print("Unexpected error: $e");
+    }
+    return null;
+  }
+
+  Future<bool> deleteEmergencyContact(String id) async {
+    try {
+      final response = await dio.delete("/api/v1/emergency-contacts/$id");
+      return response.statusCode == 200;
+    } on DioException catch (e) {
+      print("Dio error: ${e.message}");
+    } catch (e) {
+      print("Unexpected error: $e");
+    }
+    return false;
   }
 }
 

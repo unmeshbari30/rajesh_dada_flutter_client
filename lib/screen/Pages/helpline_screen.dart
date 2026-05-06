@@ -2,29 +2,130 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:rajesh_dada_padvi/controllers/home_controller.dart';
 import 'package:rajesh_dada_padvi/l10n/app_localizations.dart';
+import 'package:rajesh_dada_padvi/models/emergency_contact_model.dart';
 import 'package:rajesh_dada_padvi/widgets/app_page_frame.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-class HelplineScreen extends ConsumerStatefulWidget {
+class HelplineScreen extends ConsumerWidget {
   const HelplineScreen({super.key});
 
   @override
-  ConsumerState<HelplineScreen> createState() => _HelplineScreenState();
+  Widget build(BuildContext context, WidgetRef ref) {
+    final homeStateAsync = ref.watch(homeControllerProvider);
+
+    return homeStateAsync.when(
+      data: (state) => _HelplineBody(
+        contactsFuture: state.emergencyContactsResponse,
+        onRefresh: () async {
+          ref.invalidate(homeControllerProvider);
+          await ref.read(homeControllerProvider.future);
+        },
+      ),
+      error: (_, __) => _HelplineFrame(
+        child: _ErrorView(
+          message: 'Failed to load data.\nPull down to retry.',
+          onRefresh: () async {
+            ref.invalidate(homeControllerProvider);
+            await ref.read(homeControllerProvider.future);
+          },
+        ),
+      ),
+      loading: () => const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      ),
+    );
+  }
 }
 
-class _HelplineScreenState extends ConsumerState<HelplineScreen> {
-  Widget getScaffold(HomeState state) {
-    final theme = Theme.of(context);
+class _HelplineBody extends StatelessWidget {
+  final Future<List<EmergencyContactModel>?>? contactsFuture;
+  final Future<void> Function() onRefresh;
 
+  const _HelplineBody({required this.contactsFuture, required this.onRefresh});
+
+  @override
+  Widget build(BuildContext context) {
+    return _HelplineFrame(
+      child: FutureBuilder<List<EmergencyContactModel>?>(
+        future: contactsFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (snapshot.hasError) {
+            return _ErrorView(
+              message: 'Failed to load contacts.\nPull down to retry.',
+              onRefresh: onRefresh,
+            );
+          }
+
+          final contacts = snapshot.data;
+          if (contacts == null || contacts.isEmpty) {
+            return _ErrorView(
+              message: 'No contacts available.\nPull down to refresh.',
+              onRefresh: onRefresh,
+            );
+          }
+
+          return _ContactList(contacts: contacts, onRefresh: onRefresh);
+        },
+      ),
+    );
+  }
+}
+
+class _HelplineFrame extends StatelessWidget {
+  final Widget child;
+
+  const _HelplineFrame({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
     return AppPageFrame(
       title: context.l10n.helplineTitle,
       subtitle: context.l10n.helplineSubtitle,
       icon: Icons.support_agent_rounded,
+      child: child,
+    );
+  }
+}
+
+class _ContactList extends StatelessWidget {
+  final List<EmergencyContactModel> contacts;
+  final Future<void> Function() onRefresh;
+
+  const _ContactList({required this.contacts, required this.onRefresh});
+
+  IconData _iconForType(String? type) {
+    switch (type) {
+      case 'emergency':
+        return Icons.emergency_rounded;
+      case 'police':
+        return Icons.local_police_rounded;
+      case 'fire':
+        return Icons.fire_truck_rounded;
+      case 'ambulance':
+        return Icons.local_hospital_rounded;
+      case 'tehsil':
+        return Icons.apartment_rounded;
+      default:
+        return Icons.phone_rounded;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return RefreshIndicator(
+      onRefresh: onRefresh,
       child: ListView.builder(
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-        itemCount: emergencyContacts.length,
+        physics: const AlwaysScrollableScrollPhysics(),
+        itemCount: contacts.length,
         itemBuilder: (context, index) {
-          final contact = emergencyContacts[index];
+          final contact = contacts[index];
           return Container(
             margin: const EdgeInsets.only(bottom: 12),
             padding: const EdgeInsets.all(16),
@@ -43,7 +144,7 @@ class _HelplineScreenState extends ConsumerState<HelplineScreen> {
                     borderRadius: BorderRadius.circular(18),
                   ),
                   child: Icon(
-                    getIconForType(contact['icon']),
+                    _iconForType(contact.icon),
                     color: theme.colorScheme.primary,
                   ),
                 ),
@@ -53,25 +154,22 @@ class _HelplineScreenState extends ConsumerState<HelplineScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        contact['name'] ?? '',
+                        contact.name ?? '',
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w800,
                         ),
                       ),
                       const SizedBox(height: 4),
-                      Text(contact['number'] ?? ''),
+                      Text(contact.number ?? ''),
                     ],
                   ),
                 ),
                 IconButton(
                   icon: const Icon(Icons.call_rounded),
                   onPressed: () async {
-                    final Uri uri = Uri(scheme: 'tel', path: contact['number']);
+                    final Uri uri = Uri(scheme: 'tel', path: contact.number);
                     if (await canLaunchUrl(uri)) {
-                      await launchUrl(
-                        uri,
-                        mode: LaunchMode.externalApplication,
-                      );
+                      await launchUrl(uri, mode: LaunchMode.externalApplication);
                     }
                   },
                 ),
@@ -82,97 +180,29 @@ class _HelplineScreenState extends ConsumerState<HelplineScreen> {
       ),
     );
   }
+}
 
-  IconData getIconForType(String? type) {
-    switch (type) {
-      case 'emergency':
-        return Icons.emergency_rounded;
-      case 'police':
-        return Icons.local_police_rounded;
-      case 'fire':
-        return Icons.fire_truck_rounded;
-      case 'ambulance':
-        return Icons.local_hospital_rounded;
-      case 'tehsil':
-        return Icons.apartment_rounded;
-      default:
-        return Icons.phone_rounded;
-    }
-  }
+class _ErrorView extends StatelessWidget {
+  final String message;
+  final Future<void> Function() onRefresh;
 
-  final List<Map<String, String>> emergencyContacts = [
-    {'name': 'Taloda Ambulance', 'number': '9372079397', 'icon': 'ambulance'},
-    {'name': 'Shahada Ambulance', 'number': '9096971535', 'icon': 'ambulance'},
-    {'name': 'Taloda Police', 'number': '9764287587', 'icon': 'police'},
-    {'name': 'Shahada Police', 'number': '8380911028', 'icon': 'police'},
-    {'name': 'Taloda Tehsil Office', 'number': '9764287587', 'icon': 'tehsil'},
-    {
-      'name': 'Shahada Tehsil (Hemraj Pawar)',
-      'number': '9096971535',
-      'icon': 'tehsil',
-    },
-    {
-      'name': 'PMAY घरकुल (Kiran Suryawanshi)',
-      'number': '9764287587',
-      'icon': 'tehsil',
-    },
-    {
-      'name': 'PHC Centre /SDH Hospital Taloda',
-      'number': '8381056451',
-      'icon': 'tehsil',
-    },
-    {
-      'name': 'Borad PHC (Ravin Bhau)',
-      'number': '9834525343',
-      'icon': 'tehsil',
-    },
-    {
-      'name': 'Masavad PHC (Sachin Pawara)',
-      'number': '8888133897',
-      'icon': 'tehsil',
-    },
-    {
-      'name': 'Shahada Water Supply & Fire',
-      'number': '9763342959',
-      'icon': 'fire',
-    },
-    {'name': 'Taloda Fire Brigade', 'number': '8484028386', 'icon': 'fire'},
-  ];
-
-  Widget _errorScreen() {
-    return AppPageFrame(
-      title: context.l10n.helplineTitle,
-      subtitle: context.l10n.helplineSubtitle,
-      icon: Icons.support_agent_rounded,
-      child: RefreshIndicator(
-        onRefresh: () async {
-          ref.invalidate(homeControllerProvider);
-          await ref.read(homeControllerProvider.future);
-        },
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          children: [
-            SizedBox(
-              height: MediaQuery.of(context).size.height * 0.55,
-              child: const Center(
-                child: Text('Failed to load data.\nPull down to retry.',
-                    textAlign: TextAlign.center),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  const _ErrorView({required this.message, required this.onRefresh});
 
   @override
   Widget build(BuildContext context) {
-    final homeStateAsync = ref.watch(homeControllerProvider);
-    return homeStateAsync.when(
-      data: (state) => getScaffold(state),
-      error: (error, stackTrace) => _errorScreen(),
-      loading: () =>
-          const Scaffold(body: Center(child: CircularProgressIndicator())),
+    return RefreshIndicator(
+      onRefresh: onRefresh,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          SizedBox(
+            height: MediaQuery.of(context).size.height * 0.55,
+            child: Center(
+              child: Text(message, textAlign: TextAlign.center),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

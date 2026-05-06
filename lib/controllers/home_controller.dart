@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:rajesh_dada_padvi/controllers/authentication_controller.dart';
 import 'package:rajesh_dada_padvi/models/Files/files_response_model.dart';
 import 'package:rajesh_dada_padvi/models/complaint_payload_model.dart';
+import 'package:rajesh_dada_padvi/models/emergency_contact_model.dart';
 import 'package:rajesh_dada_padvi/models/login_payload_model.dart';
 import 'package:rajesh_dada_padvi/repository/repository.dart';
 import 'package:rajesh_dada_padvi/widgets/dropdown_value_controller.dart';
@@ -23,6 +24,7 @@ class HomeController extends _$HomeController {
     var repository = await ref.read(repositoryProvider.future);
     newState.homeDataResponse = repository.getHomePageData();
     newState.certificateDataResponse = repository.getCertificateData();
+    newState.emergencyContactsResponse = repository.getEmergencyContacts();
     newState.userName = data.userName.text;
     newState.loginResult = data.loginResult;
     return newState;
@@ -86,6 +88,7 @@ class HomeController extends _$HomeController {
 class HomeState {
   Future<FileResponseModel?>? homeDataResponse;
   Future<FileResponseModel?>? certificateDataResponse;
+  Future<List<EmergencyContactModel>?>? emergencyContactsResponse;
 
   TextEditingController adminUsernameController = TextEditingController();
   TextEditingController adminPasswordController = TextEditingController();
