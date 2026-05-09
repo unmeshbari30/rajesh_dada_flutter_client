@@ -12,6 +12,7 @@ import 'package:rajesh_dada_padvi/screen/Login_Screens/login_screen.dart';
 import 'package:rajesh_dada_padvi/screen/Notification/notification_handler.dart';
 import 'package:rajesh_dada_padvi/screen/home_screen.dart';
 import 'package:rajesh_dada_padvi/theme/app_theme.dart';
+import 'package:upgrader/upgrader.dart';
 
 // OPTIONAL: Handle background messages
 @pragma('vm:entry-point')
@@ -72,7 +73,10 @@ class MyApp extends ConsumerWidget {
           GlobalWidgetsLocalizations.delegate,
           GlobalCupertinoLocalizations.delegate,
         ],
-        home: isLoggedIn ? HomeScreen() : LoginScreen(),
+        home: UpgradeAlert(
+          showReleaseNotes: false,
+          child: isLoggedIn ? HomeScreen() : LoginScreen()
+        ),
       ),
     );
   }
